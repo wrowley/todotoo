@@ -1,29 +1,54 @@
-//
-// NOTE:
-//  Currently this code is simply a copy-paste of ../imgui/examples/example_glfw_opengl2/main.cpp
-//
+/* todotoo main function, including
+ * - managing a window and 'dear imgui' context
+ * - defining and managing the set of active to-do lists
+ *
+ * Much code here originated in ../imgui/examples/example_glfw_opengl2/main.cpp
+ */
 
-
-// dear imgui: standalone example application for GLFW + OpenGL2, using legacy fixed pipeline
-// If you are new to dear imgui, see examples/README.txt and documentation at the top of imgui.cpp.
-// (GLFW is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan graphics context creation, etc.)
-
-// **DO NOT USE THIS CODE IF YOUR CODE/ENGINE IS USING MODERN OPENGL (SHADERS, VBO, VAO, etc.)**
-// **Prefer using the code in the example_glfw_opengl2/ folder**
-// See imgui_impl_glfw.cpp for details.
-
+/* We use OpenGL renderer and GLFW platform bindings */
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl2.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <GLFW/glfw3.h>
 
-// [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
-// To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma. 
-// Your own project should not be affected, as you are likely to link with a newer binary of GLFW that is adequate for your version of Visual Studio.
-#if defined(_MSC_VER) && (_MSC_VER >= 1900) && !defined(IMGUI_DISABLE_WIN32_FUNCTIONS)
-#pragma comment(lib, "legacy_stdio_definitions")
-#endif
+#define TDT_TITLE_LEN (128)
+
+
+class TDTToDoList
+{
+    char title[TDT_TITLE_LEN];
+
+
+public:
+    inline TDTToDoList()        { memset(title, 0, TDT_TITLE_LEN); }
+    inline ~TDTToDoList()       { }
+    inline TDTToDoList(char *s) { memcpy(title, s, TDT_TITLE_LEN); }
+
+    inline char* getTitle()       { return title; }
+};
+
+class TDTToDoListSet
+{
+    int          size;
+    TDTToDoList* data;
+
+public:
+    inline TDTToDoListSet()        { size = 0; data = NULL; }
+    inline ~TDTToDoListSet()       { if (data != NULL) free(data); }
+
+    inline int getSize()                   { return size; }
+    inline TDTToDoList* getList(int index) { return &data[index]; }
+
+    void addList(char *title)
+    {
+        data       = (TDTToDoList*)realloc((TDTToDoList*)data, (size + 1) * sizeof(TDTToDoList));
+        data[size] = TDTToDoList(title);
+        size++;
+    }
+
+};
 
 static void glfw_error_callback(int error, const char* description)
 {
@@ -36,7 +61,7 @@ int main(int, char**)
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
         return 1;
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Dear ImGui GLFW+OpenGL2 example", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(1280, 720, "todotoo", NULL, NULL);
     if (window == NULL)
         return 1;
     glfwMakeContextCurrent(window);
@@ -76,6 +101,17 @@ int main(int, char**)
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    /* All of the lists we have */
+    TDTToDoListSet to_do_lists = TDTToDoListSet();
+
+    /* Dialog for creating new to-do list */
+    bool dialog_creating_new_list = false;
+    bool dialog_creating_new_list_first_focus = true;
+    char buf_new_list_name[128];
+
+    /* Actually creating the list */
+    bool create_new_list = false;
+
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
@@ -93,7 +129,9 @@ int main(int, char**)
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)
+        {
             ImGui::ShowDemoWindow(&show_demo_window);
+        }
 
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
         {
@@ -126,6 +164,55 @@ int main(int, char**)
             if (ImGui::Button("Close Me"))
                 show_another_window = false;
             ImGui::End();
+        }
+
+        if (ImGui::BeginMainMenuBar())
+        {
+            if (ImGui::BeginMenu("File"))
+            {
+                if (ImGui::MenuItem("New"))
+                {
+                    dialog_creating_new_list = true;
+                    dialog_creating_new_list_first_focus = true;
+                    memset(buf_new_list_name, 0, IM_ARRAYSIZE(buf_new_list_name));
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        if (dialog_creating_new_list)
+        {
+            ImGui::Begin("CREATE", &dialog_creating_new_list);
+            if (dialog_creating_new_list_first_focus) ImGui::SetKeyboardFocusHere();
+            ImGui::InputText("input text", buf_new_list_name, IM_ARRAYSIZE(buf_new_list_name));
+            if (!ImGui::IsItemActive())
+            {
+                if (strlen(buf_new_list_name) > 0)
+                {
+                    TDTToDoList el = TDTToDoList(buf_new_list_name);
+                    dialog_creating_new_list = false;
+                    printf("New list called '%s' will be created\n", buf_new_list_name);
+                    to_do_lists.addList(buf_new_list_name);
+//                    create_new_list = true;
+                }
+            }
+            dialog_creating_new_list_first_focus = false;
+            ImGui::End();
+        }
+
+        for (int i = 0; i < to_do_lists.getSize(); i++)
+        {
+            TDTToDoList *el = to_do_lists.getList(i);
+
+            char buf[128];
+            bool window_bool = true;
+            ImGui::SetNextWindowPos(ImVec2(100, 100), ImGuiCond_FirstUseEver);
+            ImGui::PushID(i);
+            ImGui::Begin(el->getTitle(), &window_bool);
+            ImGui::Checkbox("##0", &window_bool); ImGui::SameLine(); ImGui::InputText("##1", buf, IM_ARRAYSIZE(buf));
+            ImGui::End();
+            ImGui::PopID();
         }
 
         // Rendering

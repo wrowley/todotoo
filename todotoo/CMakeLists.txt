@@ -11,8 +11,9 @@ file(GLOB IMGUI_SOURCES
 
 include_directories(${PROJECT_SOURCE_DIR}/../imgui ${PROJECT_SOURCE_DIR}/../imgui/examples)
 
+# Add a main function
+add_executable(todotoo main.cpp ${IMGUI_SOURCES} ../imgui/examples/imgui_impl_glfw.cpp ../imgui/examples/imgui_impl_opengl2.cpp)
+
 target_link_libraries(todotoo glfw ${OPENGL_gl_LIBRARY})
 #target_include_directories(todotoo ${OPENGL_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/../imgui)
 
-# Add a main function
-add_executable(todotoo main.cpp ${IMGUI_SOURCES} ../imgui/examples/imgui_impl_glfw.cpp ../imgui/examples/imgui_impl_opengl2.cpp)
