@@ -106,11 +106,8 @@ int main(int, char**)
 
     /* Dialog for creating new to-do list */
     bool dialog_creating_new_list = false;
-    bool dialog_creating_new_list_first_focus = true;
-    char buf_new_list_name[128];
-
-    /* Actually creating the list */
-    bool create_new_list = false;
+    bool dialog_focus_gained = false;
+    char new_list_name[TDT_TITLE_LEN];
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -170,44 +167,63 @@ int main(int, char**)
         {
             if (ImGui::BeginMenu("File"))
             {
-                if (ImGui::MenuItem("New"))
+                if (ImGui::MenuItem("New List", "Ctrl+N"))
                 {
                     dialog_creating_new_list = true;
-                    dialog_creating_new_list_first_focus = true;
-                    memset(buf_new_list_name, 0, IM_ARRAYSIZE(buf_new_list_name));
                 }
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
         }
 
+        /* Set up dialog for creating a new list */
         if (dialog_creating_new_list)
         {
-            ImGui::Begin("CREATE", &dialog_creating_new_list);
-            if (dialog_creating_new_list_first_focus) ImGui::SetKeyboardFocusHere();
-            ImGui::InputText("input text", buf_new_list_name, IM_ARRAYSIZE(buf_new_list_name));
-            if (!ImGui::IsItemActive())
-            {
-                if (strlen(buf_new_list_name) > 0)
-                {
-                    TDTToDoList el = TDTToDoList(buf_new_list_name);
-                    dialog_creating_new_list = false;
-                    printf("New list called '%s' will be created\n", buf_new_list_name);
-                    to_do_lists.addList(buf_new_list_name);
-//                    create_new_list = true;
-                }
+            dialog_focus_gained = false;
+            memset(new_list_name, 0, IM_ARRAYSIZE(new_list_name));
+            ImGui::OpenPopup("Create New List");
+        }
+        /* Render the modal dialog */
+        if (ImGui::BeginPopupModal("Create New List", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            bool b_enter_was_struck = ImGui::IsKeyPressed(257 /* Enter key */) || ImGui::IsKeyPressed(335 /* Numpad enter key */);
+            ImGui::Text("Enter a title for your new list\n");
+            ImGui::Separator();
+            ImGui::InputText("##0", new_list_name, IM_ARRAYSIZE(new_list_name));
+
+            if (ImGui::IsItemActive()) { dialog_focus_gained = true; }
+            if (!ImGui::IsItemActive() && !dialog_focus_gained) { ImGui::SetKeyboardFocusHere(-1); }
+
+            if (b_enter_was_struck || ImGui::Button("OK", ImVec2(120, 0))) {
+                /* This is where the new list gets created */
+                to_do_lists.addList(new_list_name);
+                printf("New list called '%s' will be created\n", new_list_name);
+                ImGui::CloseCurrentPopup();
             }
-            dialog_creating_new_list_first_focus = false;
-            ImGui::End();
+
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+                ImGui::CloseCurrentPopup();
+            }
+
+            ImGui::EndPopup();
+            dialog_creating_new_list = false;
+        }
+        else if (io.KeyCtrl && ImGui::IsKeyPressed(78 /* N key */))
+        {
+            /* If a modal dialog is not already being rendered, allow CTRL+N to trigger one */
+            printf("Ctrl+N pushed\n");
+            dialog_creating_new_list = true;
         }
 
         for (int i = 0; i < to_do_lists.getSize(); i++)
         {
             TDTToDoList *el = to_do_lists.getList(i);
 
-            char buf[128];
+            char buf[TDT_TITLE_LEN];
             bool window_bool = true;
             ImGui::SetNextWindowPos(ImVec2(100, 100), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(350, 60), ImGuiCond_FirstUseEver);
             ImGui::PushID(i);
             ImGui::Begin(el->getTitle(), &window_bool);
             ImGui::Checkbox("##0", &window_bool); ImGui::SameLine(); ImGui::InputText("##1", buf, IM_ARRAYSIZE(buf));
