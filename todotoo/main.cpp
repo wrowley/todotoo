@@ -33,43 +33,62 @@ public:
 class TDTToDoList
 {
     char title[TDT_TITLE_LEN];
-    TDTToDoListElement *elements;
+    TDTToDoListElement **elements;
 
     int size;
 
+private:
+    inline void init()
+    {
+        size = 1;
+        elements    = (TDTToDoListElement**)malloc(sizeof(TDTToDoListElement*));
+        elements[0] = new TDTToDoListElement();
+    }
 
 public:
-    inline TDTToDoList()        { memset(title, 0, TDT_TITLE_LEN); size = 1; elements = (TDTToDoListElement*)malloc(sizeof(TDTToDoListElement)); elements[0] = TDTToDoListElement();}
-    inline ~TDTToDoList()       { }
-    inline TDTToDoList(char *s) { memcpy(title, s, TDT_TITLE_LEN); size = 1; elements = (TDTToDoListElement*)malloc(sizeof(TDTToDoListElement)); elements[0] = TDTToDoListElement();}
+    inline TDTToDoList()        { init(); memset(title, 0, TDT_TITLE_LEN); }
+    inline ~TDTToDoList()       {
+        for (int i = 0; i < size; i++)
+        {
+            delete elements[i];
+        }
+        if (elements != NULL) free(elements);
+    }
+    inline TDTToDoList(char *s) { init(); memcpy(title, s, TDT_TITLE_LEN); }
 
     inline char* getTitle()                          { return title; }
     inline int   getSize()                           { return size; }
-    inline TDTToDoListElement* getElement(int index) { return elements + index; }
+    inline TDTToDoListElement* getElement(int index) { return elements[index]; }
 
     inline void  addElement()     {
-        elements       = (TDTToDoListElement*)realloc((TDTToDoListElement*)elements, (size + 1) * sizeof(TDTToDoListElement));
-        elements[size] = TDTToDoListElement();
+        elements       = (TDTToDoListElement**)realloc((TDTToDoListElement**)elements, (size + 1) * sizeof(TDTToDoListElement*));
+        elements[size] = new TDTToDoListElement();
         size++;
     }
 };
 
 class TDTToDoListSet
 {
-    int          size;
-    TDTToDoList* data;
+    int           size;
+    TDTToDoList** data;
 
 public:
     inline TDTToDoListSet()        { size = 0; data = NULL; }
-    inline ~TDTToDoListSet()       { if (data != NULL) free(data); }
+    inline ~TDTToDoListSet()       {
+        for (int i = 0; i < size; i++)
+        {
+            delete data[i];
+        }
+        if (data != NULL) free(data);
+    }
 
     inline int getSize()                   { return size; }
-    inline TDTToDoList* getList(int index) { return &data[index]; }
+    inline TDTToDoList* getList(int index) { return data[index]; }
 
     void addList(char *title)
     {
-        data       = (TDTToDoList*)realloc((TDTToDoList*)data, (size + 1) * sizeof(TDTToDoList));
-        data[size] = TDTToDoList(title);
+        data       = (TDTToDoList**)realloc((TDTToDoList**)data, (size + 1) * sizeof(TDTToDoList*));
+        data[size] = new TDTToDoList(title);
         size++;
     }
 
@@ -254,7 +273,7 @@ int main(int, char**)
             ImGui::SetNextWindowSize(ImVec2(350, 60), ImGuiCond_FirstUseEver);
             ImGui::Begin(to_do_list->getTitle(), &window_bool);
 
-            if (enter_was_struck)
+            if (enter_was_struck && ImGui::IsWindowFocused())
             {
                 to_do_list->addElement();
             }
@@ -275,7 +294,7 @@ int main(int, char**)
                 ImGui::PopID();
             }
             ImGui::PopID();
-            if (enter_was_struck) ImGui::SetKeyboardFocusHere(-1);
+            if (enter_was_struck && ImGui::IsWindowFocused()) ImGui::SetKeyboardFocusHere(-1);
             ImGui::End();
         }
 
