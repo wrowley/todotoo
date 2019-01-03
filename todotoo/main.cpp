@@ -13,20 +13,45 @@
 #include <stdlib.h>
 #include <GLFW/glfw3.h>
 
-#define TDT_TITLE_LEN (128)
+#define TDT_TITLE_LEN    (128)
+#define TDT_CONTENTS_LEN (256)
 
+class TDTToDoListElement
+{
+    char contents[TDT_CONTENTS_LEN];
+    bool done;
+
+public:
+    inline TDTToDoListElement()  { memset(contents, 0, TDT_CONTENTS_LEN); done = false; }
+    inline ~TDTToDoListElement() { }
+
+    inline char* getContents()   { return contents; }
+    inline bool* getDoneState()  { return &done; }
+    inline bool  getDone()       { return &done; }
+};
 
 class TDTToDoList
 {
     char title[TDT_TITLE_LEN];
+    TDTToDoListElement *elements;
+
+    int size;
 
 
 public:
-    inline TDTToDoList()        { memset(title, 0, TDT_TITLE_LEN); }
+    inline TDTToDoList()        { memset(title, 0, TDT_TITLE_LEN); size = 1; elements = (TDTToDoListElement*)malloc(sizeof(TDTToDoListElement)); elements[0] = TDTToDoListElement();}
     inline ~TDTToDoList()       { }
-    inline TDTToDoList(char *s) { memcpy(title, s, TDT_TITLE_LEN); }
+    inline TDTToDoList(char *s) { memcpy(title, s, TDT_TITLE_LEN); size = 1; elements = (TDTToDoListElement*)malloc(sizeof(TDTToDoListElement)); elements[0] = TDTToDoListElement();}
 
-    inline char* getTitle()       { return title; }
+    inline char* getTitle()                          { return title; }
+    inline int   getSize()                           { return size; }
+    inline TDTToDoListElement* getElement(int index) { return elements + index; }
+
+    inline void  addElement()     {
+        elements       = (TDTToDoListElement*)realloc((TDTToDoListElement*)elements, (size + 1) * sizeof(TDTToDoListElement));
+        elements[size] = TDTToDoListElement();
+        size++;
+    }
 };
 
 class TDTToDoListSet
@@ -54,6 +79,8 @@ static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
+
+static inline bool is_enter_pushed() { return ImGui::IsKeyPressed(257 /* Enter key */) || ImGui::IsKeyPressed(335 /* Numpad enter key */); }
 
 int main(int, char**)
 {
@@ -186,11 +213,12 @@ int main(int, char**)
         /* Render the modal dialog */
         if (ImGui::BeginPopupModal("Create New List", NULL, ImGuiWindowFlags_AlwaysAutoResize))
         {
-            bool b_enter_was_struck = ImGui::IsKeyPressed(257 /* Enter key */) || ImGui::IsKeyPressed(335 /* Numpad enter key */);
+            bool b_enter_was_struck = is_enter_pushed();
             ImGui::Text("Enter a title for your new list\n");
             ImGui::Separator();
+            ImGui::PushItemWidth(-1);
             ImGui::InputText("##0", new_list_name, IM_ARRAYSIZE(new_list_name));
-
+            ImGui::PopItemWidth();
             if (ImGui::IsItemActive()) { dialog_focus_gained = true; }
             if (!ImGui::IsItemActive() && !dialog_focus_gained) { ImGui::SetKeyboardFocusHere(-1); }
 
@@ -218,17 +246,37 @@ int main(int, char**)
 
         for (int i = 0; i < to_do_lists.getSize(); i++)
         {
-            TDTToDoList *el = to_do_lists.getList(i);
+            TDTToDoList *to_do_list = to_do_lists.getList(i);
 
-            char buf[TDT_TITLE_LEN];
             bool window_bool = true;
+            bool enter_was_struck = is_enter_pushed();
             ImGui::SetNextWindowPos(ImVec2(100, 100), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(350, 60), ImGuiCond_FirstUseEver);
+            ImGui::Begin(to_do_list->getTitle(), &window_bool);
+
+            if (enter_was_struck)
+            {
+                to_do_list->addElement();
+            }
+
             ImGui::PushID(i);
-            ImGui::Begin(el->getTitle(), &window_bool);
-            ImGui::Checkbox("##0", &window_bool); ImGui::SameLine(); ImGui::InputText("##1", buf, IM_ARRAYSIZE(buf));
-            ImGui::End();
+            for (int j = 0; j < to_do_list->getSize(); j++)
+            {
+                TDTToDoListElement* el = to_do_list->getElement(j);
+                bool done = el->getDone();
+                ImGui::PushID(j);
+                ImGui::Checkbox("##0", el->getDoneState());
+                ImGui::SameLine();
+                if (done) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+                ImGui::InputText("##1", el->getContents(), TDT_CONTENTS_LEN);
+                if (done) ImGui::PopStyleColor();
+                ImGui::SameLine();
+                ImGui::Button("Delete");
+                ImGui::PopID();
+            }
             ImGui::PopID();
+            if (enter_was_struck) ImGui::SetKeyboardFocusHere(-1);
+            ImGui::End();
         }
 
         // Rendering
