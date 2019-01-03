@@ -27,7 +27,7 @@ public:
 
     inline char* getContents()   { return contents; }
     inline bool* getDoneState()  { return &done; }
-    inline bool  getDone()       { return &done; }
+    inline bool  getDone()       { return  done; }
 };
 
 class TDTToDoList
