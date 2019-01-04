@@ -16,6 +16,7 @@
 #define TDT_TITLE_LEN    (128)
 #define TDT_CONTENTS_LEN (256)
 
+/* This is a cell which contains a "to-do" item */
 class TDTToDoListElement
 {
     char contents[TDT_CONTENTS_LEN];
@@ -30,23 +31,26 @@ public:
     inline bool  getDone()       { return  done; }
 };
 
+/* This is a list of "to-do" items */
 class TDTToDoList
 {
     char title[TDT_TITLE_LEN];
     TDTToDoListElement **elements;
 
     int size;
+    bool active;
 
 private:
     inline void init()
     {
-        size = 1;
-        elements    = (TDTToDoListElement**)malloc(sizeof(TDTToDoListElement*));
-        elements[0] = new TDTToDoListElement();
+        size = 0;
+        elements = NULL;
+        active = true;
     }
 
 public:
     inline TDTToDoList()        { init(); memset(title, 0, TDT_TITLE_LEN); }
+    inline TDTToDoList(char *s) { init(); memcpy(title, s, TDT_TITLE_LEN); }
     inline ~TDTToDoList()       {
         for (int i = 0; i < size; i++)
         {
@@ -54,11 +58,12 @@ public:
         }
         if (elements != NULL) free(elements);
     }
-    inline TDTToDoList(char *s) { init(); memcpy(title, s, TDT_TITLE_LEN); }
 
     inline char* getTitle()                          { return title; }
     inline int   getSize()                           { return size; }
     inline TDTToDoListElement* getElement(int index) { return elements[index]; }
+    inline bool* getActiveState()                    { return &active; }
+    inline bool  getActive()                         { return active; }
 
     inline void  addElement()     {
         elements       = (TDTToDoListElement**)realloc((TDTToDoListElement**)elements, (size + 1) * sizeof(TDTToDoListElement*));
@@ -67,6 +72,7 @@ public:
     }
 };
 
+/* This is the set of all to-do lists that exist in the session */
 class TDTToDoListSet
 {
     int           size;
@@ -103,6 +109,7 @@ static inline bool is_enter_pushed() { return ImGui::IsKeyPressed(257 /* Enter k
 
 int main(int, char**)
 {
+    int window_width, window_height;
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -143,6 +150,7 @@ int main(int, char**)
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != NULL);
 
+    bool show_list_summary = true;
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -176,39 +184,6 @@ int main(int, char**)
             ImGui::ShowDemoWindow(&show_demo_window);
         }
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f    
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
-
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
-
         if (ImGui::BeginMainMenuBar())
         {
             if (ImGui::BeginMenu("File"))
@@ -221,6 +196,24 @@ int main(int, char**)
             }
             ImGui::EndMainMenuBar();
         }
+
+        const ImGuiWindowFlags summary_flags =
+              ImGuiWindowFlags_NoMove 
+            | ImGuiWindowFlags_NoResize
+            | ImGuiWindowFlags_NoBringToFrontOnFocus
+            ;
+        glfwGetWindowSize(window, &window_width, &window_height);
+        ImGui::SetNextWindowPos(ImVec2(0, 20));
+        ImGui::SetNextWindowSize(ImVec2(window_width / 4, window_height - 20));
+        ImGui::Begin("Active lists", NULL, summary_flags);
+        for (int i = 0; i < to_do_lists.getSize(); i++)
+        {
+            TDTToDoList *list = to_do_lists.getList(i);
+            ImGui::Selectable(list->getTitle(), list->getActiveState());
+            ImGui::SameLine();
+            ImGui::Button("Delete");
+        }
+        ImGui::End();
 
         /* Set up dialog for creating a new list */
         if (dialog_creating_new_list)
@@ -271,31 +264,39 @@ int main(int, char**)
             bool enter_was_struck = is_enter_pushed();
             ImGui::SetNextWindowPos(ImVec2(100, 100), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(350, 60), ImGuiCond_FirstUseEver);
-            ImGui::Begin(to_do_list->getTitle(), &window_bool);
 
-            if (enter_was_struck && ImGui::IsWindowFocused())
+            if (to_do_list->getActive())
             {
-                to_do_list->addElement();
-            }
+                ImGui::Begin(to_do_list->getTitle(), to_do_list->getActiveState());
 
-            ImGui::PushID(i);
-            for (int j = 0; j < to_do_list->getSize(); j++)
-            {
-                TDTToDoListElement* el = to_do_list->getElement(j);
-                bool done = el->getDone();
-                ImGui::PushID(j);
-                ImGui::Checkbox("##0", el->getDoneState());
-                ImGui::SameLine();
-                if (done) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-                ImGui::InputText("##1", el->getContents(), TDT_CONTENTS_LEN);
-                if (done) ImGui::PopStyleColor();
-                ImGui::SameLine();
-                ImGui::Button("Delete");
+                if (enter_was_struck && ImGui::IsWindowFocused())
+                {
+                    to_do_list->addElement();
+                }
+
+                ImGui::PushID(i);
+                for (int j = 0; j < to_do_list->getSize(); j++)
+                {
+                    TDTToDoListElement* el = to_do_list->getElement(j);
+                    bool done = el->getDone();
+                    ImGui::PushID(j);
+                    ImGui::Checkbox("##0", el->getDoneState());
+                    ImGui::SameLine();
+                    if (done) ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+                    ImGui::InputText("##1", el->getContents(), TDT_CONTENTS_LEN);
+                    if (done) ImGui::PopStyleColor();
+                    ImGui::SameLine();
+                    ImGui::Button("Delete");
+                    ImGui::PopID();
+                }
                 ImGui::PopID();
+
+                if (enter_was_struck && ImGui::IsWindowFocused())
+                {
+                    ImGui::SetKeyboardFocusHere(-1);
+                }
+                ImGui::End();
             }
-            ImGui::PopID();
-            if (enter_was_struck && ImGui::IsWindowFocused()) ImGui::SetKeyboardFocusHere(-1);
-            ImGui::End();
         }
 
         // Rendering
