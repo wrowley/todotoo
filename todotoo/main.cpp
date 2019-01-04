@@ -66,9 +66,18 @@ public:
     inline bool  getActive()                         { return active; }
 
     inline void  addElement()     {
-        elements       = (TDTToDoListElement**)realloc((TDTToDoListElement**)elements, (size + 1) * sizeof(TDTToDoListElement*));
-        elements[size] = new TDTToDoListElement();
         size++;
+        elements         = (TDTToDoListElement**)realloc((TDTToDoListElement**)elements, (size) * sizeof(TDTToDoListElement*));
+        elements[size-1] = new TDTToDoListElement();
+    }
+    inline void  deleteElement(int index) {
+        delete elements[index];
+        for (int i = index; i < size - 1; i++)
+        {
+            elements[i] = elements[i+1];
+        }
+        size--;
+        elements       = (TDTToDoListElement**)realloc((TDTToDoListElement**)elements, (size) * sizeof(TDTToDoListElement*));
     }
 };
 
@@ -275,7 +284,8 @@ int main(int, char**)
                 }
 
                 ImGui::PushID(i);
-                for (int j = 0; j < to_do_list->getSize(); j++)
+                int list_size = to_do_list->getSize();
+                for (int j = 0; j < list_size; j++)
                 {
                     TDTToDoListElement* el = to_do_list->getElement(j);
                     bool done = el->getDone();
@@ -286,8 +296,14 @@ int main(int, char**)
                     ImGui::InputText("##1", el->getContents(), TDT_CONTENTS_LEN);
                     if (done) ImGui::PopStyleColor();
                     ImGui::SameLine();
-                    ImGui::Button("Delete");
+                    bool delete_element = ImGui::Button("Delete");
                     ImGui::PopID();
+
+                    if (delete_element)
+                    {
+                        to_do_list->deleteElement(j);
+                        j--; list_size--;
+                    }
                 }
                 ImGui::PopID();
 
