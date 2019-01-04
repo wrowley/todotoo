@@ -51,3 +51,4 @@ glfw/src/glfw3Config.cmake
 glfw/src/glfw3ConfigVersion.cmake
 glfw/src/glfw_config.h
 imgui.ini
+*.tdt

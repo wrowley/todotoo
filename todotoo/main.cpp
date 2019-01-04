@@ -118,6 +118,27 @@ public:
 
 };
 
+/* Debugging function to dump state */
+static void dump_state(const char *filepath, TDTToDoListSet *set)
+{
+    FILE *fp = fopen(filepath, "wb+");
+    assert(fp);
+
+    for (int i = 0; i < set->getSize(); i++)
+    {
+        TDTToDoList *list = set->getList(i);
+        fprintf(fp, "%s %s\n", list->getActive() ? "@" : "$", list->getTitle());
+        for (int j = 0; j < list->getSize(); j++)
+        {
+            TDTToDoListElement *element = list->getElement(j);
+            fprintf(fp, "%s %s\n", element->getDone() ? "/" : "*", element->getContents());
+        }
+        fprintf(fp, "\n");
+    }
+
+    fclose(fp);
+}
+
 static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
@@ -355,6 +376,8 @@ int main(int, char**)
 
     glfwDestroyWindow(window);
     glfwTerminate();
+
+    dump_state("./test.tdt", &to_do_lists);
 
     return 0;
 }
