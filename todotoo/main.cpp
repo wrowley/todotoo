@@ -102,9 +102,18 @@ public:
 
     void addList(char *title)
     {
-        data       = (TDTToDoList**)realloc((TDTToDoList**)data, (size + 1) * sizeof(TDTToDoList*));
-        data[size] = new TDTToDoList(title);
         size++;
+        data         = (TDTToDoList**)realloc((TDTToDoList**)data, (size) * sizeof(TDTToDoList*));
+        data[size-1] = new TDTToDoList(title);
+    }
+    inline void  deleteList(int index) {
+        delete data[index];
+        for (int i = index; i < size - 1; i++)
+        {
+            data[i] = data[i+1];
+        }
+        size--;
+        data = (TDTToDoList**)realloc((TDTToDoList**)data, (size) * sizeof(TDTToDoList*));
     }
 
 };
@@ -166,6 +175,7 @@ int main(int, char**)
 
     /* All of the lists we have */
     TDTToDoListSet to_do_lists = TDTToDoListSet();
+    int list_size;
 
     /* Dialog for creating new to-do list */
     bool dialog_creating_new_list = false;
@@ -215,12 +225,21 @@ int main(int, char**)
         ImGui::SetNextWindowPos(ImVec2(0, 20));
         ImGui::SetNextWindowSize(ImVec2(window_width / 4, window_height - 20));
         ImGui::Begin("Active lists", NULL, summary_flags);
-        for (int i = 0; i < to_do_lists.getSize(); i++)
+        list_size = to_do_lists.getSize();
+        for (int i = 0; i < list_size; i++)
         {
+            ImGui::PushID(i);
             TDTToDoList *list = to_do_lists.getList(i);
-            ImGui::Selectable(list->getTitle(), list->getActiveState());
+            bool delete_list  = ImGui::Button("Delete");
             ImGui::SameLine();
-            ImGui::Button("Delete");
+            ImGui::Selectable(list->getTitle(), list->getActiveState());
+
+            if (delete_list)
+            {
+                to_do_lists.deleteList(i);
+                i--; list_size--;
+            }
+            ImGui::PopID();
         }
         ImGui::End();
 
@@ -284,7 +303,7 @@ int main(int, char**)
                 }
 
                 ImGui::PushID(i);
-                int list_size = to_do_list->getSize();
+                list_size = to_do_list->getSize();
                 for (int j = 0; j < list_size; j++)
                 {
                     TDTToDoListElement* el = to_do_list->getElement(j);
