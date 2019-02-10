@@ -9,11 +9,12 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl2.h"
+#include "findme.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <GLFW/glfw3.h>
 
-#define TDT_TITLE_LEN    (128)
+#define TDT_TITLE_LEN    (256)
 #define TDT_CONTENTS_LEN (256)
 
 /* This is a cell which contains a "to-do" item */
@@ -65,10 +66,11 @@ public:
     inline bool* getActiveState()                    { return &active; }
     inline bool  getActive()                         { return active; }
 
-    inline void  addElement()     {
+    inline TDTToDoListElement *addElement()     {
         size++;
         elements         = (TDTToDoListElement**)realloc((TDTToDoListElement**)elements, (size) * sizeof(TDTToDoListElement*));
         elements[size-1] = new TDTToDoListElement();
+        return elements[size-1];
     }
     inline void  deleteElement(int index) {
         delete elements[index];
@@ -100,11 +102,12 @@ public:
     inline int getSize()                   { return size; }
     inline TDTToDoList* getList(int index) { return data[index]; }
 
-    void addList(char *title)
+    TDTToDoList *addList(char *title)
     {
         size++;
         data         = (TDTToDoList**)realloc((TDTToDoList**)data, (size) * sizeof(TDTToDoList*));
         data[size-1] = new TDTToDoList(title);
+        return data[size-1];
     }
     inline void  deleteList(int index) {
         delete data[index];
@@ -118,7 +121,54 @@ public:
 
 };
 
-/* Debugging function to dump state */
+/* Function to init state from file */
+static void init_state(const char *filepath, TDTToDoListSet *set)
+{
+    FILE *fp = fopen(filepath, "rb");
+    if (fp == NULL) return;
+
+    int i; int c; char buf[TDT_CONTENTS_LEN > TDT_TITLE_LEN ? TDT_CONTENTS_LEN : TDT_TITLE_LEN];
+    TDTToDoList *list = NULL;
+
+    memset(buf, 0, sizeof(buf));
+
+    while ((c = fgetc(fp)) != EOF)
+    {
+        if (c == '@' || c == '$')
+        {
+            bool active = (c == '@');
+            if (list && (strlen(buf) != 0)) list->addElement(); /* Hanging element */
+            memset(buf, 0, sizeof(buf));
+            i = 0;
+            assert(fgetc(fp) == ' ');
+            while ((c = fgetc(fp)) != '\n')
+            {
+                buf[i++] = c;
+            }
+            list = set->addList(buf);
+            *(list->getActiveState()) = active;
+        }
+        if (c == '/' || c == '*')
+        {
+            bool done = (c == '/');
+            memset(buf, 0, sizeof(buf));
+            i = 0;
+            assert(fgetc(fp) == ' ');
+            while ((c = fgetc(fp)) != '\n')
+            {
+                buf[i++] = c;
+            }
+            TDTToDoListElement* element = list->addElement();
+            *(element->getDoneState()) = done;
+            strncpy(element->getContents(), buf, TDT_CONTENTS_LEN);
+        }
+    }
+    if (list && (strlen(buf) != 0)) list->addElement(); /* Hanging element */
+
+    fclose(fp);
+}
+
+/* Function to dump state to file */
 static void dump_state(const char *filepath, TDTToDoListSet *set)
 {
     FILE *fp = fopen(filepath, "wb+");
@@ -202,6 +252,20 @@ int main(int, char**)
     bool dialog_creating_new_list = false;
     bool dialog_focus_gained = false;
     char new_list_name[TDT_TITLE_LEN];
+
+    char bin_dir[512];
+    char state_file[1024];
+
+    findme_bin_dir
+        (bin_dir
+        ,sizeof(bin_dir)
+        );
+    printf("Path of binary directory: %s\n", bin_dir);
+    sprintf(state_file, "%s/%s", bin_dir, "todotoo.state");
+    printf("Path of state file: %s\n", state_file);
+    init_state(state_file, &to_do_lists);
+
+
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -377,7 +441,7 @@ int main(int, char**)
     glfwDestroyWindow(window);
     glfwTerminate();
 
-    dump_state("./test.tdt", &to_do_lists);
+    dump_state(state_file, &to_do_lists);
 
     return 0;
 }
