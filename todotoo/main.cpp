@@ -140,7 +140,6 @@ static void init_state(const char *filepath, TDTToDoListSet *set)
             if (list && (strlen(buf) != 0)) list->addElement(); /* Hanging element */
             memset(buf, 0, sizeof(buf));
             i = 0;
-            assert(fgetc(fp) == ' ');
             while ((c = fgetc(fp)) != '\n')
             {
                 buf[i++] = c;
@@ -153,7 +152,6 @@ static void init_state(const char *filepath, TDTToDoListSet *set)
             bool done = (c == '/');
             memset(buf, 0, sizeof(buf));
             i = 0;
-            assert(fgetc(fp) == ' ');
             while ((c = fgetc(fp)) != '\n')
             {
                 buf[i++] = c;
@@ -177,11 +175,11 @@ static void dump_state(const char *filepath, TDTToDoListSet *set)
     for (int i = 0; i < set->getSize(); i++)
     {
         TDTToDoList *list = set->getList(i);
-        fprintf(fp, "%s %s\n", list->getActive() ? "@" : "$", list->getTitle());
+        fprintf(fp, "%s%s\n", list->getActive() ? "@" : "$", list->getTitle());
         for (int j = 0; j < list->getSize(); j++)
         {
             TDTToDoListElement *element = list->getElement(j);
-            fprintf(fp, "%s %s\n", element->getDone() ? "/" : "*", element->getContents());
+            fprintf(fp, "%s%s\n", element->getDone() ? "/" : "*", element->getContents());
         }
         fprintf(fp, "\n");
     }
@@ -240,7 +238,7 @@ int main(int, char**)
     //IM_ASSERT(font != NULL);
 
     bool show_list_summary = true;
-    bool show_demo_window = true;
+    bool show_demo_window = false;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -290,7 +288,7 @@ int main(int, char**)
 
         if (ImGui::BeginMainMenuBar())
         {
-            if (ImGui::BeginMenu("File"))
+            if (ImGui::BeginMenu("Menu"))
             {
                 if (ImGui::MenuItem("New List", "Ctrl+N"))
                 {
